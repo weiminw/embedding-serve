@@ -8,7 +8,6 @@ LOG_FORMAT = "%(asctime)s [%(thread)d] [%(levelname)7s]: %(message)s [%(filename
 # 配置日志颜色
 LOG_COLORS = {
     logging.DEBUG: colorama.Fore.CYAN,
-    # logging.INFO: colorama.Fore.LIGHTWHITE_EX,
     logging.WARNING: colorama.Fore.YELLOW,
     logging.ERROR: colorama.Fore.RED,
     logging.CRITICAL: colorama.Fore.MAGENTA

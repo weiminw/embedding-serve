@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from argparse import Namespace
@@ -22,8 +23,13 @@ LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True
 async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
     try:
+        # embedding_engine = app.state.engine
+        # await embedding_engine.start()
         yield
+
     finally:
+        embedding_engine = app.state.engine
+        await embedding_engine.stop()
         logger.info("embedding server shutdown")
 
 
@@ -31,7 +37,10 @@ def init_app_state(state: State, args: Namespace) -> None:
     model_name_or_path = args.model
     # batch_size = args.batch_size
     embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=32)
+
     state.engine = embedding_engine
+    asyncio.run(embedding_engine.start())
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -67,7 +76,6 @@ async def dense_embeddings(request: SparseEmbeddingRequest, raw_request: Request
     return response
 
 if __name__ == "__main__":
-    import sys
     import argparse
 
     parser = argparse.ArgumentParser(description="FastAPI应用程序")

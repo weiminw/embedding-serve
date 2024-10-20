@@ -19,7 +19,7 @@ class EmbeddingModel(ABC):
 class AsyncEmbeddingEngine:
     sparse_queue: Queue = Queue(maxsize=1024)
     dense_queue: Queue = Queue(maxsize=1024)
-    embed_executor = ThreadPoolExecutor(max_workers=8)  # TODO
+    embed_executor = ThreadPoolExecutor(max_workers=8)
 
     def __init__(self, model_name_or_path: str, batch_size: int):
         # 通过model path 加载model

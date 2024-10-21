@@ -1,5 +1,5 @@
 import logging
-import colorama
+
 from logging.handlers import RotatingFileHandler
 
 # 定义日志格式
@@ -7,10 +7,10 @@ LOG_FORMAT = "%(asctime)s [%(thread)d] [%(levelname)7s]: %(message)s [%(filename
 
 # 配置日志颜色
 LOG_COLORS = {
-    logging.DEBUG: colorama.Fore.CYAN,
-    logging.WARNING: colorama.Fore.YELLOW,
-    logging.ERROR: colorama.Fore.RED,
-    logging.CRITICAL: colorama.Fore.MAGENTA
+    logging.DEBUG: "\033[36m{}\033[0m",
+    logging.WARNING: "\033[33m{}\033[0m",
+    logging.ERROR: "\033[31m{}\033[0m",
+    logging.CRITICAL: "\033[35m{}\033[0m",
 }
 
 # 定义日志格式器
@@ -18,7 +18,7 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         msg = super().format(record)
         if record.levelno in LOG_COLORS:
-            msg = LOG_COLORS[record.levelno] + msg + colorama.Style.RESET_ALL
+            msg = LOG_COLORS[record.levelno].format(msg)
         return msg
 
 # 创建日志处理器

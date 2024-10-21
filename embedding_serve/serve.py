@@ -23,8 +23,8 @@ LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True
 async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
     try:
-        # embedding_engine = app.state.engine
-        # await embedding_engine.start()
+        embedding_engine = app.state.engine
+        await embedding_engine.start()
         yield
 
     finally:
@@ -37,9 +37,7 @@ def init_app_state(state: State, args: Namespace) -> None:
     model_name_or_path = args.model
     # batch_size = args.batch_size
     embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=32)
-
     state.engine = embedding_engine
-    asyncio.run(embedding_engine.start())
 
 
 app = FastAPI(lifespan=lifespan)

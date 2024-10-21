@@ -13,7 +13,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "torch==2.4.1", "uvicorn", "fastapi","FlagEmbedding",
+    "torch==2.4.1", "peft", "uvicorn", "fastapi", "logging-config", "FlagEmbedding",
 ]
 
 [tool.setuptools.packages.find]

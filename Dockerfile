@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/cuda:12.6.2-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.2-runtime-ubuntu22.04
 ARG pip_source=https://pypi.org/simple
 LABEL authors="wangwm"
 #ENV HOME=/workspace

@@ -14,7 +14,7 @@ from uvicorn.config import LOGGING_CONFIG
 from embedding_serve.engine import AsyncEmbeddingEngine
 from embedding_serve.protocol import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
-from logging_config import logger, LOG_FORMAT, LOG_COLORS
+from embedding_serve.logging_config import logger, LOG_FORMAT, LOG_COLORS
 
 LOGGING_CONFIG["formatters"]["default"]["fmt"] = LOG_FORMAT
 LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True

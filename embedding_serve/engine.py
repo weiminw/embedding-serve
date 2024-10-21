@@ -7,7 +7,7 @@ from typing import Tuple, Callable
 
 from FlagEmbedding import BGEM3FlagModel
 
-from logging_config import logger
+from embedding_serve.logging_config import logger
 
 
 class EmbeddingModel(ABC):

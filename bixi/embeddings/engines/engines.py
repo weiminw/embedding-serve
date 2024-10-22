@@ -7,7 +7,7 @@ from typing import Tuple, Callable
 
 from FlagEmbedding import BGEM3FlagModel
 
-from embedding_serve.logging_config import logger
+from bixi.embeddings.logging_config import logger
 
 
 class EmbeddingModel(ABC):

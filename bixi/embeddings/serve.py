@@ -1,20 +1,17 @@
-import asyncio
 from contextlib import asynccontextmanager
 
 from argparse import Namespace
-from typing import Tuple
 
 import uvicorn
-from FlagEmbedding import FlagModel, BGEM3FlagModel
 from fastapi import FastAPI
 from starlette.datastructures import State
 from starlette.requests import Request
 from uvicorn.config import LOGGING_CONFIG
 
-from embedding_serve.engine import AsyncEmbeddingEngine
-from embedding_serve.protocol import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
+from bixi.embeddings.engines import AsyncEmbeddingEngine
+from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
-from embedding_serve.logging_config import logger, LOG_FORMAT, LOG_COLORS
+from bixi.embeddings.logging_config import logger, LOG_FORMAT
 
 LOGGING_CONFIG["formatters"]["default"]["fmt"] = LOG_FORMAT
 LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True

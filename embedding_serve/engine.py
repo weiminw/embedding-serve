@@ -17,8 +17,8 @@ class EmbeddingModel(ABC):
 
 
 class AsyncEmbeddingEngine:
-    sparse_queue: Queue = Queue(maxsize=1024)
-    dense_queue: Queue = Queue(maxsize=1024)
+    sparse_queue: Queue = Queue(maxsize=32768)
+    dense_queue: Queue = Queue(maxsize=32768)
     embed_executor = ThreadPoolExecutor(max_workers=8)
 
     def __init__(self, model_name_or_path: str, batch_size: int):
@@ -56,12 +56,12 @@ class AsyncEmbeddingEngine:
             callback = tasks[sentence]
             callback(sentence, sparse_embedding, tokens)
 
-    def _consume_task(self, batch_size:int, queue: Queue, execution: Callable):
+    def _consume_task(self, batch_size:int, embedding_queue: Queue, execution: Callable):
         batch_tasks: dict = {}
         while self._run:
             tasks_length = len(batch_tasks)
             if tasks_length <= 0: # batch_tasks 为空.
-                task = queue.get() # 阻塞一直等待有任务.
+                task = embedding_queue.get() # 阻塞一直等待有任务.
                 if task is not None:
                     sentence, callback = task
                     batch_tasks[sentence] = callback
@@ -69,11 +69,11 @@ class AsyncEmbeddingEngine:
                 execution(batch_tasks)
                 batch_tasks.clear()
             else:
-                if queue.empty(): #
+                if embedding_queue.empty(): #
                     execution(batch_tasks)
                     batch_tasks.clear()
                 else:
-                    sentence, callback = queue.get()  # 阻塞一直等待有任务.
+                    sentence, callback = embedding_queue.get()  # 阻塞一直等待有任务.
                     batch_tasks[sentence] = callback
 
     async def start(self):
@@ -87,14 +87,13 @@ class AsyncEmbeddingEngine:
         self.dense_queue.put(None)
 
     async def text_sparse_embed(self, sentences: list[str]) -> Tuple[list[dict[int, float]], int]:
-        logger.debug("---------")
         embedding_results = {}
         # 定义信号量, 确保该批处理完成再返回
         semaphore = asyncio.Semaphore(0)
 
         # 定义回调函数
-        def callback(sentence: str, embedding: dict[int, float], tokens: list[int]):
-            embedding_results[sentence] = (embedding, tokens)
+        def callback(_sentence: str, _embedding: dict[int, float], _tokens: list[int]):
+            embedding_results[_sentence] = (_embedding, _tokens)
             if len(embedding_results) == len(sentences):
                 semaphore.release()
 
@@ -103,7 +102,6 @@ class AsyncEmbeddingEngine:
             self.sparse_queue.put(item=(sentence, callback), block=False)
 
         await semaphore.acquire()
-        logger.debug("---------")
         embeddings: list[dict[int, float]] = []
         tokens_num: int = 0
         for embedding_result_values in embedding_results.values():
@@ -118,8 +116,8 @@ class AsyncEmbeddingEngine:
         semaphore = asyncio.Semaphore(0)
 
         # 定义回调函数
-        def callback(sentence: str, embedding: list[list[float]], tokens: list[int]):
-            embedding_results[sentence] = (embedding, tokens)
+        def callback(_sentence: str, _embedding: list[list[float]], _tokens: list[int]):
+            embedding_results[_sentence] = (_embedding, _tokens)
             if len(embedding_results) == len(sentences):
                 semaphore.release()
 

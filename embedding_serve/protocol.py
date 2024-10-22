@@ -8,7 +8,7 @@ class DenseEmbeddingRequest(BaseModel):
 
 
 class DenseEmbeddingData(BaseModel):
-    object: Literal['list'] = 'list'
+    object: Literal['list'] = 'embedding'
     index: int = 0
     embedding: list[float]
 
@@ -29,7 +29,7 @@ class SparseEmbeddingRequest(BaseModel):
 
 
 class SparseEmbeddingData(BaseModel):
-    object: Literal['list'] = 'dict'
+    object: Literal['list'] = 'embedding'
     index: int = 0
     embedding: dict[int,float]
 

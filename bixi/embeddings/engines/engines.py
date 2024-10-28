@@ -38,7 +38,7 @@ class AsyncEmbeddingEngine:
                                                            return_colbert_vecs=False).get("lexical_weights")
         logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
 
-        for sentence, sparse_embedding, tokens in zip(sentences, _sparse_embeddings, _sparse_embeddings):
+        for sentence, sparse_embedding, tokens in zip(sentences, _sparse_embeddings, tokens_list):
             callback = tasks[sentence]
             callback(sentence, sparse_embedding, tokens)
 

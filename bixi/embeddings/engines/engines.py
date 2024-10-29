@@ -27,44 +27,53 @@ class AsyncEmbeddingEngine:
         self.batch_size = batch_size
         self._run = False
 
-    def _execute_sparse_batch(self, tasks: dict):
-        sentences = list(tasks.keys())
+    def _execute_sparse_batch(self, tasks: list[tuple]):
+        task_sentences: [str] = []
+        task_callbacks: [Callable] = []
+        for task in tasks:
+            task_sentences.append(task[0])
+            task_callbacks.append(task[1])
+
         tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=sentences).get(
+            batch_text_or_text_pairs=task_sentences).get(
             "input_ids")
         logger.debug("tokens_list = %s", tokens_list)
-        _sparse_embeddings: list[dict] = self.model.encode(sentences,
+        _sparse_embeddings: list[dict] = self.model.encode(task_sentences,
+                                                           batch_size=min(self.batch_size, len(task_sentences)),
                                                            return_dense=False, return_sparse=True,
                                                            return_colbert_vecs=False).get("lexical_weights")
         logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
 
-        for sentence, sparse_embedding, tokens in zip(sentences, _sparse_embeddings, tokens_list):
-            callback = tasks[sentence]
-            callback(sentence, sparse_embedding, tokens)
+        for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks, _sparse_embeddings, tokens_list):
+            task_callback(sentence, sparse_embedding, tokens)
 
-    def _execute_dense_batch(self, tasks: dict):
-        sentences = list(tasks.keys())
+    def _execute_dense_batch(self, tasks: list[tuple]):
+        task_sentences: [str] = []
+        task_callbacks: [Callable] = []
+        for task in tasks:
+            task_sentences.append(task[0])
+            task_callbacks.append(task[1])
         tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=sentences).get(
+            batch_text_or_text_pairs=task_sentences).get(
             "input_ids")
-        _dense_embeddings: list[list[float]] = self.model.encode(sentences,
-                                                                 batch_size=min(self.batch_size, len(sentences)),
+        _dense_embeddings: list[list[float]] = self.model.encode(task_sentences,
+                                                                 batch_size=min(self.batch_size, len(task_sentences)),
                                                                  return_dense=True, return_sparse=False,
                                                                  return_colbert_vecs=False).get("dense_vecs")
 
-        for sentence, sparse_embedding, tokens in zip(sentences, _dense_embeddings, tokens_list):
-            callback = tasks[sentence]
-            callback(sentence, sparse_embedding, tokens)
+        for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks, _dense_embeddings, tokens_list):
+
+            task_callback(sentence, dense_embedding, tokens)
 
     def _consume_task(self, batch_size:int, embedding_queue: Queue, execution: Callable):
-        batch_tasks: dict = {}
+        batch_tasks: list[tuple] = []
         while self._run:
             tasks_length = len(batch_tasks)
             if tasks_length <= 0: # batch_tasks 为空.
                 task = embedding_queue.get() # 阻塞一直等待有任务.
                 if task is not None:
                     sentence, callback = task
-                    batch_tasks[sentence] = callback
+                    batch_tasks.append((sentence, callback))
             elif tasks_length >= batch_size: # batch_tasks 达到批处理size
                 execution(batch_tasks)
                 batch_tasks.clear()
@@ -73,8 +82,10 @@ class AsyncEmbeddingEngine:
                     execution(batch_tasks)
                     batch_tasks.clear()
                 else:
-                    sentence, callback = embedding_queue.get()  # 阻塞一直等待有任务.
-                    batch_tasks[sentence] = callback
+                    task = embedding_queue.get()  # 阻塞一直等待有任务.
+                    if task is not None:
+                        sentence, callback = task
+                        batch_tasks.append((sentence, callback))
 
     async def start(self):
         self._run = True
@@ -87,13 +98,13 @@ class AsyncEmbeddingEngine:
         self.dense_queue.put(None)
 
     async def text_sparse_embed(self, sentences: list[str]) -> Tuple[list[dict[int, float]], int]:
-        embedding_results = {}
+        embedding_results: list[tuple] = []
         # 定义信号量, 确保该批处理完成再返回
         semaphore = asyncio.Semaphore(0)
 
         # 定义回调函数
         def callback(_sentence: str, _embedding: dict[int, float], _tokens: list[int]):
-            embedding_results[_sentence] = (_embedding, _tokens)
+            embedding_results.append((_embedding, _tokens))
             if len(embedding_results) == len(sentences):
                 semaphore.release()
 
@@ -104,20 +115,20 @@ class AsyncEmbeddingEngine:
         await semaphore.acquire()
         embeddings: list[dict[int, float]] = []
         tokens_num: int = 0
-        for embedding_result_values in embedding_results.values():
+        for embedding_result_values in embedding_results:
             embedding, tokens = embedding_result_values
             embeddings.append(embedding)
             tokens_num += (len(tokens) - 2)
         return embeddings, tokens_num
 
     async def text_dense_embed(self, sentences: list[str]) -> Tuple[list[list[float]], int]:
-        embedding_results = {}
+        embedding_results: list[tuple] = []
         # 定义信号量, 确保该批处理完成再返回
         semaphore = asyncio.Semaphore(0)
 
         # 定义回调函数
         def callback(_sentence: str, _embedding: list[list[float]], _tokens: list[int]):
-            embedding_results[_sentence] = (_embedding, _tokens)
+            embedding_results.append((_embedding, _tokens))
             if len(embedding_results) == len(sentences):
                 semaphore.release()
 
@@ -128,8 +139,8 @@ class AsyncEmbeddingEngine:
         await semaphore.acquire()
         embeddings: list[list[float]] = []
         tokens_num: int = 0
-        for embedding_result_values in embedding_results.values():
-            embedding, tokens = embedding_result_values
+        for embedding_result in embedding_results:
+            embedding, tokens = embedding_result
             embeddings.append(embedding)
             tokens_num += (len(tokens) - 2)
         return embeddings, tokens_num

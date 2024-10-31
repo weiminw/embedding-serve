@@ -11,9 +11,12 @@ RUN mkdir -p ~/.ssh && chmod 700 /root/.ssh && mkdir -p /run/sshd && touch /root
     && chmod 600 /root/.ssh/authorized_keys
 RUN ln -snf /usr/bin/python3.11 /usr/bin/python3
 RUN python3 -m venv heliumos-env
-RUN source /workspace/heliumos-env/bin/activate \
- && python3 -m pip install --no-cache-dir --upgrade pip -i ${pip_source}
-RUN source /workspace/heliumos-env/bin/activate \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    source /workspace/heliumos-env/bin/activate \
+    && python3 -m pip install --upgrade pip -i ${pip_source}
+RUN --mount=type=cache,target=/root/.cache/pip \
+    source /workspace/heliumos-env/bin/activate \
     && cd /workspace/heliumos-bixi-embeddings \
-    && pip3 install --no-cache-dir . -i ${pip_source}
+    && pip3 install torch==2.4.1 FlagEmbedding==1.3.0 -i ${pip_source} \
+    && pip3 install . -i ${pip_source}
 RUN pip3 cache purge && cd /workspace && rm -rf /workspace/heliumos-bixi-embeddings

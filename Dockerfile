@@ -17,7 +17,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     source /workspace/heliumos-env/bin/activate \
     && cd /workspace/heliumos-bixi-embeddings \
-    && wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.6/flash_attn-2.5.6+cu122torch2.3cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
-    && pip3 install flash_attn-2.5.6+cu122torch2.3cxx11abiFALSE-cp311-cp311-linux_x86_64.whl torch==2.4.1 FlagEmbedding==1.3.0 -i ${pip_source} \
+#    && wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.6/flash_attn-2.5.6+cu122torch2.3cxx11abiFALSE-cp311-cp311-linux_x86_64.whl \
+#    && pip3 install flash_attn-2.5.6+cu122torch2.3cxx11abiFALSE-cp311-cp311-linux_x86_64.whl -i ${pip_source} \
+    && pip3 install torch==2.4.1 FlagEmbedding==1.2.11 -i ${pip_source} \
     && pip3 install . -i ${pip_source}
 RUN pip3 cache purge && cd /workspace && rm -rf /workspace/heliumos-bixi-embeddings

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from argparse import Namespace
@@ -21,7 +22,7 @@ async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
     try:
         embedding_engine = app.state.engine
-        await embedding_engine.start()
+        asyncio.get_event_loop().create_task(embedding_engine.start())
         yield
 
     finally:

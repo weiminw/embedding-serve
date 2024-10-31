@@ -89,8 +89,9 @@ class AsyncEmbeddingEngine:
 
     async def start(self):
         self._run = True
-        self.embed_executor.submit(self._consume_task,self.batch_size,self.sparse_queue, self._execute_sparse_batch)
-        self.embed_executor.submit(self._consume_task, self.batch_size, self.dense_queue, self._execute_dense_batch)
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(self.embed_executor, self._consume_task,self.batch_size,self.sparse_queue, self._execute_sparse_batch)
+        loop.run_in_executor(self.embed_executor, self._consume_task,self.batch_size,self.dense_queue, self._execute_dense_batch)
 
     async def stop(self):
         self._run = False

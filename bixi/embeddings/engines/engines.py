@@ -3,8 +3,10 @@ import queue
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+from select import error
 from typing import Tuple, Callable
 
+import torch.cuda
 from FlagEmbedding import BGEM3FlagModel
 
 from bixi.embeddings.logging_config import logger
@@ -33,16 +35,22 @@ class AsyncEmbeddingEngine:
         for task in tasks:
             task_sentences.append(task[0])
             task_callbacks.append(task[1])
-
-        tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=task_sentences).get(
-            "input_ids")
-        logger.debug("tokens_list = %s", tokens_list)
-        _sparse_embeddings: list[dict] = self.model.encode(task_sentences,
-                                                           batch_size=min(self.batch_size, len(task_sentences)),
-                                                           return_dense=False, return_sparse=True,
-                                                           return_colbert_vecs=False).get("lexical_weights")
-        logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
+        try:
+            tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
+                max_length=1024,
+                batch_text_or_text_pairs=task_sentences).get(
+                "input_ids")
+            logger.debug("tokens_list = %s", tokens_list)
+            _sparse_embeddings: list[dict] = self.model.encode(task_sentences,
+                                                               batch_size=self.batch_size,
+                                                               return_dense=False, return_sparse=True,
+                                                               return_colbert_vecs=False).get("lexical_weights")
+            logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
+        except Exception as e:
+            logger.error("Error in _execute_sparse_batch: %s", e)
+            torch.cuda.empty_cache()
+            task_callbacks[0]([], [], e)
+            return
 
         for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks, _sparse_embeddings, tokens_list):
             task_callback(sentence, sparse_embedding, tokens)
@@ -53,16 +61,25 @@ class AsyncEmbeddingEngine:
         for task in tasks:
             task_sentences.append(task[0])
             task_callbacks.append(task[1])
-        tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=task_sentences).get(
-            "input_ids")
-        _dense_embeddings: list[list[float]] = self.model.encode(task_sentences,
-                                                                 batch_size=min(self.batch_size, len(task_sentences)),
-                                                                 return_dense=True, return_sparse=False,
-                                                                 return_colbert_vecs=False).get("dense_vecs")
+
+        try:
+            tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
+                max_length=8192,
+                batch_text_or_text_pairs=task_sentences).get(
+                "input_ids")
+
+
+            _dense_embeddings: list[list[float]] = self.model.encode(task_sentences,
+                                                                     batch_size=self.batch_size,
+                                                                     return_dense=True, return_sparse=False,
+                                                                     return_colbert_vecs=False).get("dense_vecs")
+        except Exception as e:
+            logger.error("Error in _execute_dense_batch: %s", e)
+            torch.cuda.empty_cache()
+            task_callbacks[0]([], [], e)
+            return
 
         for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks, _dense_embeddings, tokens_list):
-
             task_callback(sentence, dense_embedding, tokens)
 
     def _consume_task(self, batch_size:int, embedding_queue: Queue, execution: Callable):
@@ -102,18 +119,22 @@ class AsyncEmbeddingEngine:
         embedding_results: list[tuple] = []
         # 定义信号量, 确保该批处理完成再返回
         semaphore = asyncio.Semaphore(0)
-
+        error: dict = {}
         # 定义回调函数
-        def callback(_sentence: str, _embedding: dict[int, float], _tokens: list[int]):
+        def callback(_sentence: str, _embedding: dict[int, float], _tokens: list[int], _error: Exception = None):
+            if _error is not None:
+                semaphore.release()
+                error["error"] = _error
             embedding_results.append((_embedding, _tokens))
             if len(embedding_results) == len(sentences):
                 semaphore.release()
-
         # 提交
         for sentence in sentences:
             self.sparse_queue.put(item=(sentence, callback), block=False)
 
         await semaphore.acquire()
+        if "error" in error:
+            raise error["error"]
         embeddings: list[dict[int, float]] = []
         tokens_num: int = 0
         for embedding_result_values in embedding_results:
@@ -126,9 +147,12 @@ class AsyncEmbeddingEngine:
         embedding_results: list[tuple] = []
         # 定义信号量, 确保该批处理完成再返回
         semaphore = asyncio.Semaphore(0)
-
+        error: dict = {}
         # 定义回调函数
-        def callback(_sentence: str, _embedding: list[list[float]], _tokens: list[int]):
+        def callback(_sentence: str, _embedding: list[list[float]], _tokens: list[int], _error: Exception = None):
+            if _error is not None:
+                semaphore.release()
+                error["error"] = _error
             embedding_results.append((_embedding, _tokens))
             if len(embedding_results) == len(sentences):
                 semaphore.release()
@@ -138,6 +162,8 @@ class AsyncEmbeddingEngine:
             self.dense_queue.put(item=(sentence, callback), block=False)
 
         await semaphore.acquire()
+        if "error" in error:
+            raise error["error"]
         embeddings: list[list[float]] = []
         tokens_num: int = 0
         for embedding_result in embedding_results:

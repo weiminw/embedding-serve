@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from starlette.datastructures import State
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from uvicorn.config import LOGGING_CONFIG
 
 from bixi.embeddings.engines import AsyncEmbeddingEngine
@@ -34,11 +35,17 @@ async def lifespan(app: FastAPI):
 def init_app_state(state: State, args: Namespace) -> None:
     model_name_or_path = args.model
     # batch_size = args.batch_size
-    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=32)
+    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=1024)
     state.engine = embedding_engine
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def exception_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"error": str(exc)})
+
 
 @app.post("/v1/embeddings/sparse")
 async def sparse_embeddings(request: SparseEmbeddingRequest, raw_request: Request) -> SparseEmbeddingResponse:

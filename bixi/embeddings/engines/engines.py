@@ -48,8 +48,8 @@ class AsyncEmbeddingEngine:
             logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
         except Exception as e:
             logger.error("Error in _execute_sparse_batch: %s", e)
-            torch.cuda.empty_cache()
-            task_callbacks[0]([], [], e)
+            for _callback in task_callbacks:
+                _callback([], [], e)
             return
 
         for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks, _sparse_embeddings, tokens_list):
@@ -75,8 +75,8 @@ class AsyncEmbeddingEngine:
                                                                      return_colbert_vecs=False).get("dense_vecs")
         except Exception as e:
             logger.error("Error in _execute_dense_batch: %s", e)
-            torch.cuda.empty_cache()
-            task_callbacks[0]([], [], e)
+            for _callback  in task_callbacks:
+                _callback([], [], e)
             return
 
         for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks, _dense_embeddings, tokens_list):

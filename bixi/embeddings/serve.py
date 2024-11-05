@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
     try:
         embedding_engine = app.state.engine
-        asyncio.get_event_loop().create_task(embedding_engine.start())
+        await embedding_engine.start()
         yield
 
     finally:

@@ -22,7 +22,7 @@ class EmbeddingModel(ABC):
 class AsyncEmbeddingEngine:
     sparse_queue: Queue = Queue(maxsize=32768)
     dense_queue: Queue = Queue(maxsize=32768)
-    embed_executor = ThreadPoolExecutor(max_workers=8)
+    embed_executor = ThreadPoolExecutor(max_workers=4)
 
     def __init__(self, model_name_or_path: str, batch_size: int):
         # 通过model path 加载model
@@ -114,6 +114,7 @@ class AsyncEmbeddingEngine:
 
     async def start(self):
         self._run = True
+
         loop = asyncio.get_event_loop()
         loop.run_in_executor(self.embed_executor, self._consume_task, self.batch_size, self.sparse_queue,
                              self._execute_sparse_batch)
@@ -124,6 +125,7 @@ class AsyncEmbeddingEngine:
         self._run = False
         self.sparse_queue.put(None)
         self.dense_queue.put(None)
+        self.embed_executor.shutdown(wait=False, cancel_futures=True)
 
     async def text_sparse_embed(self, sentences: list[str]) -> Tuple[list[dict[int, float]], int]:
         embedding_results: list[tuple] = []

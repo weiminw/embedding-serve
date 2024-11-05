@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str, default="0.0.0.0", help="主机地址")
     parser.add_argument("--port", type=int, default=8000, help="端口号")
     parser.add_argument("--model", type=str, default="Baai/bge-m3", help="huggingface模型ID或者本地模型的路径")
-    parser.add_argument("--batch-size", type=int, default=512, help="批处理大小")
+    parser.add_argument("--batch-size", type=int, default=256, help="批处理大小")
     parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")
     args = parser.parse_args()

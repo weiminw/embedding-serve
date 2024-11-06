@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import queue
+import traceback
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from queue import Queue
 from typing import Tuple, Callable
 
@@ -37,11 +39,15 @@ class AsyncEmbeddingEngine:
             task_sentences.append(task[0])
             task_callbacks.append(task[1])
         try:
-            tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-                max_length=self.max_length,
-                truncation=TruncationStrategy.LONGEST_FIRST,
-                batch_text_or_text_pairs=task_sentences).get(
-                "input_ids")
+            # tokens_list = [self.model.tokenizer.encode(
+            #     s, max_length=self.max_length, return_tensors="pt"
+            # ) for s in task_sentences]
+            # tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
+            #     max_length=self.max_length,
+            #     truncation=TruncationStrategy.LONGEST_FIRST,
+            #     batch_text_or_text_pairs=deepcopy(task_sentences)).get(
+            #     "input_ids")
+            tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
             logger.debug("tokens_list = %s", tokens_list)
             _sparse_embeddings: list[dict] = self.model.encode(
                 max_length=self.max_length,
@@ -52,7 +58,8 @@ class AsyncEmbeddingEngine:
                 return_colbert_vecs=False).get("lexical_weights")
             logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
         except Exception as e:
-            logger.error("Error in _execute_sparse_batch: %s", e)
+            traceback.print_exc()
+            logger.error("Error in _execute_sparse_batch: %s", e.__traceback__)
             for _callback in task_callbacks:
                 _callback(None, [], [], e)
             return
@@ -69,11 +76,15 @@ class AsyncEmbeddingEngine:
             task_callbacks.append(task[1])
 
         try:
-            tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-                truncation=TruncationStrategy.LONGEST_FIRST,
-                max_length=self.max_length,
-                batch_text_or_text_pairs=task_sentences).get(
-                "input_ids")
+            # tokens_list = [self.model.tokenizer.encode(
+            #     s, max_length=self.max_length, truncation=TruncationStrategy.LONGEST_FIRST, return_tensors="pt"
+            # ) for s in task_sentences]
+            # tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
+            #     truncation=TruncationStrategy.LONGEST_FIRST,
+            #     max_length=self.max_length,
+            #     batch_text_or_text_pairs=deepcopy(task_sentences)).get(
+            #     "input_ids")
+            tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
 
             _dense_embeddings: list[list[float]] = self.model.encode(
                 max_length=self.max_length,
@@ -83,6 +94,7 @@ class AsyncEmbeddingEngine:
                 return_sparse=False,
                 return_colbert_vecs=False).get("dense_vecs")
         except Exception as e:
+            traceback.print_exc()
             logger.error("Error in _execute_dense_batch: %s", e)
             for _callback in task_callbacks:
                 _callback(None, [], [], e)

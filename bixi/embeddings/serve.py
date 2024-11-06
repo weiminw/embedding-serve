@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from argparse import Namespace
@@ -13,11 +14,12 @@ from uvicorn.config import LOGGING_CONFIG
 from bixi.embeddings.engines import AsyncEmbeddingEngine
 from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
-from bixi.embeddings.logging_config import logger, LOG_FORMAT
+from bixi.embeddings.logging_config import LOG_FORMAT, configure_logging, get_logging_configuration
 
-LOGGING_CONFIG["formatters"]["default"]["fmt"] = LOG_FORMAT
-LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True
+# LOGGING_CONFIG["formatters"]["default"]["fmt"] = LOG_FORMAT
+# LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True
 
+logger = logging.getLogger("bixi.embeddings.serve")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
@@ -37,6 +39,12 @@ def init_app_state(state: State, args: Namespace) -> None:
     batch_size = args.batch_size
     embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size)
     state.engine = embedding_engine
+    log_level = args.log_level.upper()
+    configure_logging(logger_name="bixi", level=log_level)
+    # configure_logging(logger_name="root", level="INFO")
+    configure_logging(logger_name="uvicorn", level="INFO")
+    configure_logging(logger_name="uvicorn.error", level="INFO")
+    configure_logging(logger_name="uvicorn.access", level="INFO")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -90,6 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=256, help="批处理大小")
     parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")
+    parser.add_argument("--log-level", type=str, default="DEBUG", help="日志级别")
     args = parser.parse_args()
     init_app_state(app.state, args)
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, log_config=get_logging_configuration())

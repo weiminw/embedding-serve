@@ -1,17 +1,16 @@
 import asyncio
+import logging
 import queue
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
-from select import error
 from typing import Tuple, Callable
 
 import torch.cuda
 from FlagEmbedding import BGEM3FlagModel
 from transformers.tokenization_utils_base import TruncationStrategy
 
-from bixi.embeddings.logging_config import logger
-
+logger = logging.getLogger(__name__)
 
 class EmbeddingModel(ABC):
     @abstractmethod

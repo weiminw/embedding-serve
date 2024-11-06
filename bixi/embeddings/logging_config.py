@@ -1,11 +1,12 @@
-import logging
+import logging.config
+from typing import Literal
 
-from logging.handlers import RotatingFileHandler
+__all__ = ['configure_logging']
 
 # 定义日志格式
 LOG_FORMAT = "%(asctime)s [%(thread)d] [%(levelname)7s]: %(message)s [%(filename)s - %(funcName)s:%(lineno)d]"
 
-# 配置日志颜色
+# 定义日志颜色
 LOG_COLORS = {
     logging.DEBUG: "\033[36m{}\033[0m",
     logging.WARNING: "\033[33m{}\033[0m",
@@ -21,23 +22,38 @@ class ColoredFormatter(logging.Formatter):
             msg = LOG_COLORS[record.levelno].format(msg)
         return msg
 
-# 创建日志处理器
-file_handler = RotatingFileHandler("log.log", maxBytes=1024*1024*10, backupCount=5)
-console_handler = logging.StreamHandler()
 
-# 创建日志格式器
-file_formatter = logging.Formatter(LOG_FORMAT)
-console_formatter = ColoredFormatter(LOG_FORMAT)
+logging_config_dict = {
+    'version': 1,
+    'formatters': {
+        'colored': {
+            '()': ColoredFormatter,
+            'format': LOG_FORMAT
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'colored',
+        }
+    },
+    "loggers": {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    }
+}
 
-# 设置格式器
-file_handler.setFormatter(file_formatter)
-console_handler.setFormatter(console_formatter)
+def configure_logging(logger_name: str, level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]):
+    loggers: dict = logging_config_dict.get("loggers")
+    loggers.setdefault(logger_name, {
+        'handlers': ['console'],
+        'level': level,
+        'propagate': False,
+    })
+    logging.config.dictConfig(logging_config_dict)
+    return logging_config_dict
 
-# 配置日志输出
-logging.basicConfig(
-    level=logging.DEBUG,
-    handlers=[console_handler, file_handler]
-)
-
-# 创建一个全局的日志对象
-logger = logging.getLogger()
+def get_logging_configuration() -> dict:
+    return logging_config_dict

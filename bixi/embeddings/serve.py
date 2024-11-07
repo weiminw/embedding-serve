@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -14,12 +13,10 @@ from uvicorn.config import LOGGING_CONFIG
 from bixi.embeddings.engines import AsyncEmbeddingEngine
 from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
-from bixi.embeddings.logging_config import LOG_FORMAT, configure_logging, get_logging_configuration
+from bixi.embeddings import configure_logging, get_logging_configuration
 
-# LOGGING_CONFIG["formatters"]["default"]["fmt"] = LOG_FORMAT
-# LOGGING_CONFIG["formatters"]["default"]["use_colors"] = True
+logger = logging.getLogger("bixi.serve")
 
-logger = logging.getLogger("bixi.embeddings.serve")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("embedding server start...")
@@ -98,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str, default="0.0.0.0", help="主机地址")
     parser.add_argument("--port", type=int, default=8000, help="端口号")
     parser.add_argument("--model", type=str, default="Baai/bge-m3", help="huggingface模型ID或者本地模型的路径")
-    parser.add_argument("--batch-size", type=int, default=128, help="批处理大小")
+    parser.add_argument("--batch-size", type=int, default=256, help="批处理大小")
     parser.add_argument("--max-workers-num", type=int, default=8, help="并发工作协程数")
     parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")

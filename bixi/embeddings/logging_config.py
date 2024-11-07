@@ -34,6 +34,7 @@ logging_config_dict = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'level': 'DEBUG',
             'formatter': 'colored',
         }
     },
@@ -41,6 +42,7 @@ logging_config_dict = {
         '': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': True,
         },
     }
 }

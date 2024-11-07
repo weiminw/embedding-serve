@@ -37,14 +37,17 @@ async def lifespan(app: FastAPI):
 def init_app_state(state: State, args: Namespace) -> None:
     model_name_or_path = args.model
     batch_size = args.batch_size
-    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size)
-    state.engine = embedding_engine
+    max_workers_num = args.max_workers_num
     log_level = args.log_level.upper()
     configure_logging(logger_name="bixi", level=log_level)
     # configure_logging(logger_name="root", level="INFO")
     configure_logging(logger_name="uvicorn", level="INFO")
     configure_logging(logger_name="uvicorn.error", level="INFO")
     configure_logging(logger_name="uvicorn.access", level="INFO")
+    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size, max_workers_num=max_workers_num)
+    state.engine = embedding_engine
+
+
 
 
 app = FastAPI(lifespan=lifespan)
@@ -96,6 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000, help="端口号")
     parser.add_argument("--model", type=str, default="Baai/bge-m3", help="huggingface模型ID或者本地模型的路径")
     parser.add_argument("--batch-size", type=int, default=128, help="批处理大小")
+    parser.add_argument("--max-workers-num", type=int, default=8, help="并发工作协程数")
     parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")
     parser.add_argument("--log-level", type=str, default="DEBUG", help="日志级别")

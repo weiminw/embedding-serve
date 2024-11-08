@@ -1,4 +1,5 @@
 import logging.config
+import sys
 from typing import Literal
 
 LOG_FORMAT = "%(asctime)s [%(thread)d] [%(levelname)7s]: %(message)s [%(filename)s - %(funcName)s:%(lineno)d]"
@@ -33,6 +34,7 @@ logging_config_dict = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'default',
+            "stream": "ext://sys.stdout"
         }
     },
     "loggers": {

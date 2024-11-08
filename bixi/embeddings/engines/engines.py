@@ -6,7 +6,7 @@ from asyncio import Queue, Semaphore
 from copy import deepcopy
 from typing import Tuple, Callable, Coroutine
 
-from FlagEmbedding import BGEM3FlagModel
+from FlagEmbedding import BGEM3FlagModel, FlagAutoModel
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,8 @@ class AsyncEmbeddingEngine:
     max_workers: Semaphore
     def __init__(self, model_name_or_path: str, batch_size: int, max_token_length: int = 8192, max_workers_num: int = 8):
         # 通过model path 加载model
-        self.model = BGEM3FlagModel(model_name_or_path, use_fp16=True)
+        # self.model: BGEM3FlagModel = BGEM3FlagModel(model_name_or_path, use_fp16=True, query_max_length=max_token_length)
+        self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=max_token_length)
         self.batch_size = batch_size
         self.max_token_length = max_token_length
         self._run = False
@@ -51,7 +52,7 @@ class AsyncEmbeddingEngine:
                 logger.debug("tokens_list = %s", tokens_list)
                 _sparse_embeddings: list[dict] = self.model.encode(
                     max_length=self.max_token_length,
-                    sentences=task_sentences,
+                    queries=task_sentences,
                     batch_size=self.batch_size,
                     return_dense=False,
                     return_sparse=True,
@@ -90,11 +91,11 @@ class AsyncEmbeddingEngine:
 
                 _dense_embeddings: list[list[float]] = self.model.encode(
                     max_length=self.max_token_length,
-                    sentences=task_sentences,
+                    queries=task_sentences,
                     batch_size=self.batch_size,
                     return_dense=True,
                     return_sparse=False,
-                    return_colbert_vecs=False).get("dense_vecs")
+                    return_colbert_vecs=False).get("dense_vecs").tolist()
         except Exception as e:
             traceback.print_exc()
             logger.error("Error in _execute_dense_batch: %s", e)

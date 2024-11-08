@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "heliumos-bixi-embeddings"
-version = "0.5.4"
+version = "0.5.5"
 description = "An open platform for load large language model."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "torch==2.4.1", "peft", "uvicorn", "fastapi", "logging-config", "FlagEmbedding",
+    "torch==2.4.1", "peft", "uvicorn", "fastapi", "logging-config", "FlagEmbedding==1.3.2",
 ]
 
 [tool.setuptools.packages.find]

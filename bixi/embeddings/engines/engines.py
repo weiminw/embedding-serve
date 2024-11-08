@@ -1,16 +1,12 @@
 import asyncio
 import logging
-import queue
 import traceback
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
 from asyncio import Queue, Semaphore
-from typing import Tuple, Callable, Coroutine, Any
+from copy import deepcopy
+from typing import Tuple, Callable, Coroutine
 
-import torch.cuda
 from FlagEmbedding import BGEM3FlagModel
-from transformers.tokenization_utils_base import TruncationStrategy
 
 logger = logging.getLogger(__name__)
 

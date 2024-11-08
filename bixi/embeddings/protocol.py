@@ -2,6 +2,7 @@ from typing import Union, Literal
 
 from pydantic import BaseModel
 
+
 class DenseEmbeddingRequest(BaseModel):
     model: str
     input: Union[list[str], str]

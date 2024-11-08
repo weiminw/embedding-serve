@@ -1,9 +1,6 @@
 import logging.config
 from typing import Literal
 
-__all__ = ['configure_logging']
-
-# 定义日志格式
 LOG_FORMAT = "%(asctime)s [%(thread)d] [%(levelname)7s]: %(message)s [%(filename)s - %(funcName)s:%(lineno)d]"
 
 # 定义日志颜色
@@ -25,8 +22,9 @@ class ColoredFormatter(logging.Formatter):
 
 logging_config_dict = {
     'version': 1,
+    'disable_existing_loggers': False,
     'formatters': {
-        'colored': {
+        'default': {
             '()': ColoredFormatter,
             'format': LOG_FORMAT
         }
@@ -34,8 +32,7 @@ logging_config_dict = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG',
-            'formatter': 'colored',
+            'formatter': 'default',
         }
     },
     "loggers": {

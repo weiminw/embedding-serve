@@ -1,34 +1,33 @@
-import logging
-from contextlib import asynccontextmanager
-
+import logging.config
 from argparse import Namespace
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
 from starlette.datastructures import State
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from uvicorn.config import LOGGING_CONFIG
 
-from bixi.embeddings.engines import AsyncEmbeddingEngine
 from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
-from bixi.embeddings import configure_logging, get_logging_configuration
+from bixi.embeddings.engines import AsyncEmbeddingEngine
+from bixi.embeddings.settings import configure_logging, get_logging_configuration
 
-logger = logging.getLogger("bixi.serve")
+logger = logging.getLogger("bixi.embeddings.serve")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("embedding server start...")
     try:
+        logger.info("Waiting for embedding server startup")
         embedding_engine = app.state.engine
         await embedding_engine.start()
+        logger.info("Embedding server started")
         yield
 
     finally:
         embedding_engine = app.state.engine
         await embedding_engine.stop()
-        logger.info("embedding server shutdown")
+        logger.info("Embedding server shutdown")
 
 
 def init_app_state(state: State, args: Namespace) -> None:
@@ -37,25 +36,22 @@ def init_app_state(state: State, args: Namespace) -> None:
     max_workers_num = args.max_workers_num
     log_level = args.log_level.upper()
     configure_logging(logger_name="bixi", level=log_level)
-    # configure_logging(logger_name="root", level="INFO")
     configure_logging(logger_name="uvicorn", level="INFO")
     configure_logging(logger_name="uvicorn.error", level="INFO")
     configure_logging(logger_name="uvicorn.access", level="INFO")
+    logger.info("args: %s", args)
     embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size, max_workers_num=max_workers_num)
     state.engine = embedding_engine
 
+embedding_app = FastAPI(lifespan=lifespan)
 
 
-
-app = FastAPI(lifespan=lifespan)
-
-
-@app.exception_handler(Exception)
+@embedding_app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.post("/v1/embeddings/sparse")
+@embedding_app.post("/v1/embeddings/sparse")
 async def sparse_embeddings(request: SparseEmbeddingRequest, raw_request: Request) -> SparseEmbeddingResponse:
     if isinstance(request.input, list):
         inputs = request.input
@@ -72,7 +68,7 @@ async def sparse_embeddings(request: SparseEmbeddingRequest, raw_request: Reques
     return response
 
 
-@app.post("/v1/embeddings")
+@embedding_app.post("/v1/embeddings")
 async def dense_embeddings(request: SparseEmbeddingRequest, raw_request: Request) -> DenseEmbeddingResponse:
     if isinstance(request.input, list):
         inputs = request.input
@@ -101,5 +97,5 @@ if __name__ == "__main__":
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")
     parser.add_argument("--log-level", type=str, default="DEBUG", help="日志级别")
     args = parser.parse_args()
-    init_app_state(app.state, args)
-    uvicorn.run(app, host=args.host, port=args.port, log_config=get_logging_configuration())
+    init_app_state(embedding_app.state, args)
+    uvicorn.run(embedding_app, host=args.host, port=args.port, log_config=get_logging_configuration())

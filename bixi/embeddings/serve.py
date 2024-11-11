@@ -53,6 +53,7 @@ async def exception_handler(request: Request, exc: Exception):
 
 @embedding_app.post("/v1/embeddings/sparse")
 async def sparse_embeddings(request: SparseEmbeddingRequest, raw_request: Request) -> SparseEmbeddingResponse:
+    logger.debug("received sparse request")
     if isinstance(request.input, list):
         inputs = request.input
     else:
@@ -64,12 +65,13 @@ async def sparse_embeddings(request: SparseEmbeddingRequest, raw_request: Reques
     sparse_embedding_datas = [SparseEmbeddingData(embedding = item, index = i) for i, item in enumerate(embeddings)]
 
     response = SparseEmbeddingResponse(data = sparse_embedding_datas, model=request.model, usage=EmbeddingUsage(prompt_tokens=usage, total_tokens=usage))
-    # logger.debug("sparse response: %s", response)
+    logger.debug("sparse embeddings: %s", len(inputs))
     return response
 
 
 @embedding_app.post("/v1/embeddings")
 async def dense_embeddings(request: SparseEmbeddingRequest, raw_request: Request) -> DenseEmbeddingResponse:
+    logger.debug("received dense request")
     if isinstance(request.input, list):
         inputs = request.input
     else:
@@ -81,7 +83,7 @@ async def dense_embeddings(request: SparseEmbeddingRequest, raw_request: Request
     dense_embedding_datas = [DenseEmbeddingData(embedding = item, index = i) for i, item in enumerate(embeddings)]
 
     response = DenseEmbeddingResponse(data = dense_embedding_datas, model=request.model, usage=EmbeddingUsage(prompt_tokens=usage, total_tokens=usage))
-    # logger.debug("dense response: %s", response)
+    logger.debug("dense embeddings: %s", len(inputs))
     return response
 
 if __name__ == "__main__":

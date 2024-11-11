@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 import traceback
 from abc import ABC, abstractmethod
 from asyncio import Queue, Semaphore
@@ -38,6 +39,8 @@ class AsyncEmbeddingEngine:
         for task in tasks:
             task_sentences.append(task[0])
             task_callbacks.append(task[1])
+
+        _start_time = time.time()
         try:
             # tokens_list = [self.model.tokenizer.encode(
             #     s, max_length=self.max_length, return_tensors="pt"
@@ -49,7 +52,6 @@ class AsyncEmbeddingEngine:
             #     "input_ids")
             async with self.max_workers:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
-                logger.debug("tokens_list = %s", tokens_list)
                 _sparse_embeddings: list[dict] = self.model.encode(
                     max_length=self.max_token_length,
                     queries=task_sentences,
@@ -58,17 +60,17 @@ class AsyncEmbeddingEngine:
                     return_sparse=True,
                     return_colbert_vecs=False
                 ).get("lexical_weights")
-                logger.debug("_sparse_embeddings = %s", _sparse_embeddings)
+                for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks,
+                                                                             _sparse_embeddings,
+                                                                             tokens_list):
+                    task_callback(sentence, sparse_embedding, tokens)
         except Exception as e:
-            traceback.print_exc()
-            logger.error("Error in _execute_sparse_batch: %s", e.__traceback__)
+            logger.exception("Error in _execute_sparse_batch: %s", e)
             for _callback in task_callbacks:
                 _callback(None, [], [], e)
             return
-
-        for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks, _sparse_embeddings,
-                                                                     tokens_list):
-            task_callback(sentence, sparse_embedding, tokens)
+        _end_time = time.time()
+        logger.debug("finished sparse embedding %s sentences, used %s 毫秒", len(task_sentences), (_end_time - _start_time) * 1000)
 
     async def _execute_dense_batch(self, tasks: list[tuple]):
         task_sentences: [str] = []
@@ -76,7 +78,7 @@ class AsyncEmbeddingEngine:
         for task in tasks:
             task_sentences.append(task[0])
             task_callbacks.append(task[1])
-
+        _start_time = time.time()
         try:
             # tokens_list = [self.model.tokenizer.encode(
             #     s, max_length=self.max_length, truncation=TruncationStrategy.LONGEST_FIRST, return_tensors="pt"
@@ -96,24 +98,23 @@ class AsyncEmbeddingEngine:
                     return_dense=True,
                     return_sparse=False,
                     return_colbert_vecs=False).get("dense_vecs").tolist()
+                for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks,
+                                                                            _dense_embeddings, tokens_list):
+                    task_callback(sentence, dense_embedding, tokens)
         except Exception as e:
-            traceback.print_exc()
-            logger.error("Error in _execute_dense_batch: %s", e)
+            logger.exception("Error in _execute_dense_batch: %s", e)
             for _callback in task_callbacks:
                 _callback(None, [], [], e)
             return
+        _end_time = time.time()
+        logger.debug("finished dense embedding %s sentences, used %s 毫秒", len(task_sentences), (_end_time - _start_time) * 1000)
 
-        for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks, _dense_embeddings,
-                                                                    tokens_list):
-            task_callback(sentence, dense_embedding, tokens)
 
     async def _consume_task(self, batch_size: int, embedding_queue: Queue, execution: Callable[...,Coroutine]):
         batch_tasks: list[tuple] = []
         while self._run:
-            logger.debug("batch_tasks = %s", batch_tasks)
             tasks_length = len(batch_tasks)
             if tasks_length <= 0:  # batch_tasks 为空.
-                logger.debug("batch_task is empty, wait get task from queue")
                 task = await embedding_queue.get()  # 阻塞一直等待有任务.
                 if task is not None:
                     sentence, callback = task
@@ -123,16 +124,11 @@ class AsyncEmbeddingEngine:
                     embedding_queue.task_done()
                     break
             elif tasks_length >= batch_size:  # batch_tasks 达到批处理size
-                # execution(batch_tasks)
-                logger.debug("save documents")
                 embedding_task = asyncio.create_task(execution(deepcopy(batch_tasks)))
                 batch_tasks.clear()
             else:
-                logger.debug("batch_task %s, queue size %s", len(batch_tasks), embedding_queue.qsize())
                 is_empty = embedding_queue.empty()
                 if is_empty:  #
-                    # execution(batch_tasks)
-                    logger.debug("save documents")
                     embedding_task = asyncio.create_task(execution(deepcopy(batch_tasks)))
                     batch_tasks.clear()
                 else:

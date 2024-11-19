@@ -8,6 +8,7 @@ from copy import deepcopy
 from typing import Tuple, Callable, Coroutine
 
 from FlagEmbedding import BGEM3FlagModel, FlagAutoModel
+from transformers import AutoModel
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class AsyncEmbeddingEngine:
         # 通过model path 加载model
         # self.model: BGEM3FlagModel = BGEM3FlagModel(model_name_or_path, use_fp16=True, query_max_length=max_token_length)
         self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=dense_embedding_max_token_length)
+
         self.batch_size = batch_size
         self.dense_embedding_max_token_length = dense_embedding_max_token_length
         self.sparse_embedding_max_token_length = sparse_embedding_max_token_length

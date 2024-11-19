@@ -3,10 +3,12 @@ from argparse import Namespace
 from contextlib import asynccontextmanager
 
 import uvicorn
+from FlagEmbedding import FlagAutoModel
 from fastapi import FastAPI
 from starlette.datastructures import State
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from transformers import AutoConfig, AutoModel, XLMRobertaModel, PreTrainedModel
 
 from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
@@ -40,8 +42,19 @@ def init_app_state(state: State, args: Namespace) -> None:
     configure_logging(logger_name="uvicorn.error", level="INFO")
     configure_logging(logger_name="uvicorn.access", level="INFO")
     logger.info("args: %s", args)
-    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size, max_workers_num=max_workers_num)
-    state.engine = embedding_engine
+    raw_model: PreTrainedModel = FlagAutoModel.from_finetuned(args.model[0])
+
+    logger.debug("is PreTrainedModel = %s, type = %s", isinstance(raw_model, PreTrainedModel), type(raw_model))
+    # logger.debug("raw model: %s", type(raw_model.eval()))
+    raw_model = AutoModel.from_pretrained(args.model[1])
+    # logger.debug("raw model: %s", raw_model.eval())
+    logger.debug("is PreTrainedModel = %s", isinstance(raw_model, PreTrainedModel))
+    # logger.debug("config: %s", AutoConfig.from_pretrained(args.model[1]))
+
+    # logger.info("config: %", AutoConfig.from_pretrained(args.model[0]))
+    # logger.info("config: %", AutoConfig.from_pretrained(args.model[1]))
+    # embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size, max_workers_num=max_workers_num)
+    # state.engine = embedding_engine
 
 embedding_app = FastAPI(lifespan=lifespan)
 
@@ -89,10 +102,11 @@ async def dense_embeddings(request: SparseEmbeddingRequest, raw_request: Request
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="FastAPI应用程序")
+    parser = argparse.ArgumentParser(description="Embedding Server ")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="主机地址")
     parser.add_argument("--port", type=int, default=8000, help="端口号")
-    parser.add_argument("--model", type=str, default="Baai/bge-m3", help="huggingface模型ID或者本地模型的路径")
+    parser.add_argument("--model", type=str, action="append", help="huggingface模型ID或者本地模型的路径")
+    parser.add_argument("--max-token-len", type=int, action="append", default=[8192], help="最大embedding token长度")
     parser.add_argument("--batch-size", type=int, default=256, help="批处理大小")
     parser.add_argument("--max-workers-num", type=int, default=8, help="并发工作协程数")
     parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
@@ -100,4 +114,5 @@ if __name__ == "__main__":
     parser.add_argument("--log-level", type=str, default="DEBUG", help="日志级别")
     args = parser.parse_args()
     init_app_state(embedding_app.state, args)
-    uvicorn.run(embedding_app, host=args.host, port=args.port, log_config=get_logging_configuration())
+    # parser.print_help()
+    # uvicorn.run(embedding_app, host=args.host, port=args.port, log_config=get_logging_configuration())

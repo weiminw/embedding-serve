@@ -32,7 +32,7 @@ class SparseEmbeddingRequest(BaseModel):
 class SparseEmbeddingData(BaseModel):
     object: Literal['list'] = 'embedding'
     index: int = 0
-    embedding: dict[int,float]
+    embedding: dict[str,float]
 
 
 class SparseEmbeddingResponse(BaseModel):

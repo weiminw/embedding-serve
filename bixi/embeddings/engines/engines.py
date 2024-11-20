@@ -7,16 +7,11 @@ from asyncio import Queue, Semaphore
 from copy import deepcopy
 from typing import Tuple, Callable, Coroutine
 
-from FlagEmbedding import BGEM3FlagModel, FlagAutoModel
 from transformers import AutoModel
 
+from bixi.embeddings.models.base import EmbeddingModel
+
 logger = logging.getLogger(__name__)
-
-class EmbeddingModel(ABC):
-    @abstractmethod
-    def text_sparse_embed(self, batch_sentences: list[str]) -> list[dict[int, float]]:
-        ...
-
 
 class AsyncEmbeddingEngine:
     sparse_queue: Queue = Queue(maxsize=32768)
@@ -29,8 +24,8 @@ class AsyncEmbeddingEngine:
     def __init__(self, model_name_or_path: str, batch_size: int, dense_embedding_max_token_length: int = 8192, sparse_embedding_max_token_length: int = 512, max_workers_num: int = 8):
         # 通过model path 加载model
         # self.model: BGEM3FlagModel = BGEM3FlagModel(model_name_or_path, use_fp16=True, query_max_length=max_token_length)
-        self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=dense_embedding_max_token_length)
-
+        # self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=dense_embedding_max_token_length)
+        self.model: EmbeddingModel = EmbeddingModel(model_name_or_path, use_fp16=True, max_token_length=dense_embedding_max_token_length)
         self.batch_size = batch_size
         self.dense_embedding_max_token_length = dense_embedding_max_token_length
         self.sparse_embedding_max_token_length = sparse_embedding_max_token_length
@@ -60,12 +55,10 @@ class AsyncEmbeddingEngine:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
                 _sparse_embeddings: list[dict] = self.model.encode(
                     max_length=self.sparse_embedding_max_token_length,
-                    queries=task_sentences,
+                    texts=task_sentences,
                     batch_size=self.batch_size,
-                    return_dense=False,
-                    return_sparse=True,
-                    return_colbert_vecs=False
-                ).get("lexical_weights")
+                    embedding_type='text_sparse_embedding'
+                )
                 for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks,
                                                                              _sparse_embeddings,
                                                                              tokens_list):
@@ -99,11 +92,10 @@ class AsyncEmbeddingEngine:
 
                 _dense_embeddings: list[list[float]] = self.model.encode(
                     max_length=self.dense_embedding_max_token_length,
-                    queries=task_sentences,
+                    texts=task_sentences,
                     batch_size=self.batch_size,
-                    return_dense=True,
-                    return_sparse=False,
-                    return_colbert_vecs=False).get("dense_vecs").tolist()
+                    embedding_type='text_dense_embedding'
+                )
                 for sentence, task_callback, dense_embedding, tokens in zip(task_sentences, task_callbacks,
                                                                             _dense_embeddings, tokens_list):
                     task_callback(sentence, dense_embedding, tokens)

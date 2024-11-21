@@ -6,14 +6,13 @@ import numpy as np
 import torch
 import transformers
 from transformers import AutoConfig, AutoTokenizer, is_torch_npu_available, AutoModel, AutoModelForTokenClassification, \
-    BatchEncoding
+    BatchEncoding, SiglipModel, ViTModel
 from transformers.modeling_outputs import TokenClassifierOutput
-from transformers.utils import ModelOutput
 from typing_extensions import Literal
 
 
 class EmbeddingModel(torch.nn.Module):
-    _support_embedding_types: list[Literal["text_dense_embedding", "text_sparse_embedding"]] = []
+    _support_embedding_types: list[Literal["text_dense_embedding", "text_sparse_embedding", "image_embedding"]] = []
     def __init__(self, model_name_or_path: str, use_fp16: bool, max_token_length: int, device: str = None, trust_remote_code: bool = True):
         super(EmbeddingModel, self).__init__()
         if device:
@@ -29,13 +28,35 @@ class EmbeddingModel(torch.nn.Module):
                 self.device = torch.device("cpu")
                 use_fp16 = False
         self.max_token_length = max_token_length
-        self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
-        self.model = AutoModelForTokenClassification.from_pretrained(
-            model_name_or_path, trust_remote_code=True, torch_dtype=torch.float16 if use_fp16 else None
-        ).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
-        print(self.model.eval())
+        self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+        model_type = self.config.model_type
+        if model_type == "new":  # Alibaba-NLP: GTE
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                model_name_or_path,
+                trust_remote_code=trust_remote_code,
+                torch_dtype=torch.float16 if use_fp16 else None,
+                device_map=self.device)
+            self._support_embedding_types = ["text_dense_embedding", "text_sparse_embedding"]
+        elif model_type == "siglip":
+            self.model = SiglipModel.from_pretrained(
+                pretrained_model_name_or_path=model_name_or_path,
+                torch_dtype=torch.float16 if use_fp16 else None,
+                device_map=self.device,
+                attn_implementation="sdpa")
+            self._support_embedding_types = ["image_embedding"]
+        elif model_type == "vit":
+            self.model = ViTModel.from_pretrained(
+                pretrained_model_name_or_path=model_name_or_path,
+                attn_implementation="sdpa",
+                torch_dtype=torch.float16 if use_fp16 else None,
+                device_map=self.device)
+            self._support_embedding_types = ["image_embedding"]
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
+
         print(self.config)
+        print(self.config.model_type)
 
     @staticmethod
     def last_token_pool(last_hidden_states: torch.Tensor,
@@ -98,6 +119,9 @@ class EmbeddingModel(torch.nn.Module):
     def compute_sparse_scores(self, x: list[dict], y: list[dict]) -> list[float]:
         scores = [self._compute_sparse_scores(embedding_1, embedding_2) for embedding_1, embedding_2 in zip(x,y)]
         return scores
+
+    def compute_dense_scores(self, x: numpy.array, y: numpy.array) -> numpy.array:
+        scores = numpy.dot(x, y.T)
 
     @torch.no_grad()
     def encode(self, texts: list[str], max_length:int = 8192, batch_size: int = 16, embedding_type: Literal['text_dense_embedding','text_sparse_embedding'] = 'text_dense_embedding') -> Union[list[list[float]], list[dict]]:

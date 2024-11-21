@@ -21,11 +21,13 @@ class AsyncEmbeddingEngine:
     sparse_embedding_max_token_length: int
     max_dense_workers: Semaphore
     max_sparse_workers: Semaphore
-    def __init__(self, model_name_or_path: str, batch_size: int, dense_embedding_max_token_length: int = 8192, sparse_embedding_max_token_length: int = 512, max_workers_num: int = 8):
+    def __init__(self, models: dict[str,EmbeddingModel], batch_size: int, dense_embedding_max_token_length: int = 8192, sparse_embedding_max_token_length: int = 512, max_workers_num: int = 8):
         # 通过model path 加载model
         # self.model: BGEM3FlagModel = BGEM3FlagModel(model_name_or_path, use_fp16=True, query_max_length=max_token_length)
         # self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=dense_embedding_max_token_length)
-        self.model: EmbeddingModel = EmbeddingModel(model_name_or_path, use_fp16=True, max_token_length=dense_embedding_max_token_length)
+        # self.model: EmbeddingModel = EmbeddingModel(model_name_or_path, use_fp16=True, max_token_length=dense_embedding_max_token_length)
+        logger.debug("loaded models: %s", models)
+        self.models = models
         self.batch_size = batch_size
         self.dense_embedding_max_token_length = dense_embedding_max_token_length
         self.sparse_embedding_max_token_length = sparse_embedding_max_token_length
@@ -43,21 +45,13 @@ class AsyncEmbeddingEngine:
 
         _start_time = time.time()
         try:
-            # tokens_list = [self.model.tokenizer.encode(
-            #     s, max_length=self.max_length, return_tensors="pt"
-            # ) for s in task_sentences]
-            # tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            #     max_length=self.max_length,
-            #     truncation=TruncationStrategy.LONGEST_FIRST,
-            #     batch_text_or_text_pairs=deepcopy(task_sentences)).get(
-            #     "input_ids")
             async with self.max_sparse_workers:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
-                _sparse_embeddings: list[dict] = self.model.encode(
+                _sparse_embeddings: list[dict] = self.model.encode_text(
                     max_length=self.sparse_embedding_max_token_length,
                     texts=task_sentences,
                     batch_size=self.batch_size,
-                    embedding_type='text_sparse_embedding'
+                    encode_type='sparse'
                 )
                 for sentence, task_callback, sparse_embedding, tokens in zip(task_sentences, task_callbacks,
                                                                              _sparse_embeddings,
@@ -79,14 +73,6 @@ class AsyncEmbeddingEngine:
             task_callbacks.append(task[1])
         _start_time = time.time()
         try:
-            # tokens_list = [self.model.tokenizer.encode(
-            #     s, max_length=self.max_length, truncation=TruncationStrategy.LONGEST_FIRST, return_tensors="pt"
-            # ) for s in task_sentences]
-            # tokens_list: list[list[int]] = self.model.tokenizer.batch_encode_plus(
-            #     truncation=TruncationStrategy.LONGEST_FIRST,
-            #     max_length=self.max_length,
-            #     batch_text_or_text_pairs=deepcopy(task_sentences)).get(
-            #     "input_ids")
             async with self.max_dense_workers:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
 

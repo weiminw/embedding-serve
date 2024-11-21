@@ -12,6 +12,7 @@ from transformers import AutoConfig, AutoModel, XLMRobertaModel, PreTrainedModel
 from bixi.embeddings import SparseEmbeddingRequest, SparseEmbeddingResponse, SparseEmbeddingData, \
     DenseEmbeddingData, DenseEmbeddingResponse, EmbeddingUsage
 from bixi.embeddings.engines import AsyncEmbeddingEngine
+from bixi.embeddings.models.base import EmbeddingModel
 from bixi.embeddings.settings import configure_logging, get_logging_configuration
 
 logger = logging.getLogger("bixi.embeddings.serve")
@@ -52,8 +53,12 @@ def init_app_state(state: State, args: Namespace) -> None:
 
     # logger.info("config: %", AutoConfig.from_pretrained(args.model[0]))
     # logger.info("config: %", AutoConfig.from_pretrained(args.model[1]))
-    embedding_engine = AsyncEmbeddingEngine(model_name_or_path=model_name_or_path, batch_size=batch_size, max_workers_num=max_workers_num)
-    state.engine = embedding_engine
+    models: dict[str,EmbeddingModel] = {}
+    for model_name_or_path, served_model_name in zip(args.model, args.served_model_name):
+        model = EmbeddingModel(model_name_or_path, use_fp16=True, max_token_length=8192)
+        models.setdefault(served_model_name, model)
+    embedding_engine = AsyncEmbeddingEngine(models=models, batch_size=batch_size, max_workers_num=max_workers_num)
+    # state.engine = embedding_engine
 
 embedding_app = FastAPI(lifespan=lifespan)
 
@@ -104,11 +109,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Embedding Server ")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="主机地址")
     parser.add_argument("--port", type=int, default=8000, help="端口号")
-    parser.add_argument("--model", type=str, help="huggingface模型ID或者本地模型的路径")
+    parser.add_argument("--model", type=str, action="append", help="huggingface模型ID或者本地模型的路径")
     parser.add_argument("--max-token-len", type=int, action="append", default=[8192], help="最大embedding token长度")
     parser.add_argument("--batch-size", type=int, default=256, help="批处理大小")
     parser.add_argument("--max-workers-num", type=int, default=8, help="并发工作协程数")
-    parser.add_argument("--served-model-name", type=str, default="bge", help="服务模型名称")
+    parser.add_argument("--served-model-name", type=str, action="append", help="服务模型名称")
     parser.add_argument("--api-ssl-key", type=str, default=None, help="API SSL密钥文件路径")
     parser.add_argument("--log-level", type=str, default="DEBUG", help="日志级别")
     args = parser.parse_args()

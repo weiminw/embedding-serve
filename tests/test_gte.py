@@ -1,1 +1,1 @@
-import torch
+from transformers import AutoConfig

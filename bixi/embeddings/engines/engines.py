@@ -1,13 +1,9 @@
 import asyncio
 import logging
 import time
-import traceback
-from abc import ABC, abstractmethod
 from asyncio import Queue, Semaphore
 from copy import deepcopy
-from io import BytesIO
 
-from encodings.base64_codec import base64_decode
 from typing import Tuple, Callable, Coroutine
 
 from PIL import Image
@@ -22,20 +18,15 @@ class AsyncEmbeddingEngine:
     dense_queue: Queue = Queue(maxsize=32768)
     image_queue: Queue = Queue(maxsize=32768)
     batch_size: int
-    dense_embedding_max_token_length: int
+    max_token_length: int
     sparse_embedding_max_token_length: int
     max_dense_workers: Semaphore
     max_sparse_workers: Semaphore
-    def __init__(self, model: EmbeddingModel, batch_size: int, dense_embedding_max_token_length: int = 8192, sparse_embedding_max_token_length: int = 512, max_workers_num: int = 8):
-        # 通过model path 加载model
-        # self.model: BGEM3FlagModel = BGEM3FlagModel(model_name_or_path, use_fp16=True, query_max_length=max_token_length)
-        # self.model = FlagAutoModel.from_finetuned(model_name_or_path=model_name_or_path, use_fp16=True, query_max_length=dense_embedding_max_token_length)
-        # self.model: EmbeddingModel = EmbeddingModel(model_name_or_path, use_fp16=True, max_token_length=dense_embedding_max_token_length)
-        logger.debug("loaded model: %s", model)
+    def __init__(self, model: EmbeddingModel, batch_size: int, max_token_length: int = 8192, max_workers_num: int = 8):
+        # logger.debug("loaded model: %s", model)
         self.model = model
         self.batch_size = batch_size
-        self.dense_embedding_max_token_length = dense_embedding_max_token_length
-        self.sparse_embedding_max_token_length = sparse_embedding_max_token_length
+        self.max_token_length = max_token_length
         self._run = False
         self.max_dense_workers = Semaphore(int(max_workers_num/2))
         self.max_sparse_workers = Semaphore(int(max_workers_num/2))
@@ -53,7 +44,7 @@ class AsyncEmbeddingEngine:
             async with self.max_sparse_workers:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
                 _sparse_embeddings: list[dict] = self.model.encode_text(
-                    max_length=self.sparse_embedding_max_token_length,
+                    max_length=self.max_token_length,
                     texts=task_sentences,
                     batch_size=self.batch_size,
                     encode_type='sparse'
@@ -82,7 +73,7 @@ class AsyncEmbeddingEngine:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_sentences))]
 
                 _dense_embeddings: list[list[float]] = self.model.encode_text(
-                    max_length=self.dense_embedding_max_token_length,
+                    max_length=self.max_token_length,
                     texts=task_sentences,
                     batch_size=self.batch_size,
                     encode_type='dense'
@@ -110,7 +101,7 @@ class AsyncEmbeddingEngine:
                 tokens_list: list[list[int]] = [[0] for _ in range(len(task_images))]
 
                 _dense_embeddings: list[list[float]] = self.model.encode_image(
-                    max_length=self.dense_embedding_max_token_length,
+                    max_length=self.max_token_length,
                     images=task_images,
                     batch_size=self.batch_size,
                 )
@@ -118,12 +109,12 @@ class AsyncEmbeddingEngine:
                                                                             _dense_embeddings, tokens_list):
                     task_callback(image, dense_embedding, tokens)
         except Exception as e:
-            logger.exception("Error in _execute_dense_batch: %s", e)
+            logger.exception("Error in _execute_image_batch: %s", e)
             for _callback in task_callbacks:
                 _callback(None, [], [], e)
             return
         _end_time = time.time()
-        logger.debug("finished dense embedding %s sentences, used %s 毫秒", len(task_images), (_end_time - _start_time) * 1000)
+        logger.debug("finished image embedding %s images, used %s 毫秒", len(task_images), (_end_time - _start_time) * 1000)
 
     async def _consume_task(self, batch_size: int, embedding_queue: Queue, execution: Callable[...,Coroutine]):
         batch_tasks: list[tuple] = []

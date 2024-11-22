@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class EmbeddingRequest(BaseModel):
     model: str
     input: Union[list[str], str]
-    embedding_type: Literal['text_dense', 'text_sparse', 'image', 'video'] = 'text_dense'
+    embedding_type: Literal['text_dense_embedding', 'text_sparse_embedding', 'image_embedding'] = 'text_dense_embedding'
 
 
 class DenseEmbeddingData(BaseModel):

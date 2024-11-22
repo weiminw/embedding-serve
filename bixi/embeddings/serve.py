@@ -56,21 +56,32 @@ def init_app_state(state: State, args: Namespace) -> None:
 
 embedding_app = FastAPI(lifespan=lifespan)
 
+def base64_to_image(base64_str: str) -> Image:
+    _s = base64_str.split(",")
+    _head = _s[0]
+    _content = _s[1]
+    if re.match(r"^data:image\/(" + "|".join(["jpeg", "jpg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg"]) + r");base64", _head):
+        return Image.open(BytesIO(base64.b64decode(_content)))
+    else:
+        raise ValueError(f"Input string should be valid base64 encoded string and  start with 'data:image/xxx;base64', currently supported image types are: jpeg, jpg, png, gif, bmp, tiff, tif, webp, svg")
 
 @embedding_app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"error": str(exc)})
 
 @embedding_app.post("/v1/embeddings")
-async def dense_embeddings(request: EmbeddingRequest, raw_request: Request) -> EmbeddingResponse:
-    logger.debug("received dense request")
+async def execute_embedding(request: EmbeddingRequest, raw_request: Request) -> EmbeddingResponse:
+    logger.debug("received embedding request")
     if isinstance(request.input, list):
         inputs = request.input
     else:
         inputs = [request.input]
     embedding_type = request.embedding_type
     embedding_engine: AsyncEmbeddingEngine = raw_request.app.state.engine
-    if embedding_type == 'text_dense':
+    if embedding_type not in embedding_engine.model.support_embedding_types:
+        raise ValueError(f"embedding type {embedding_type} is not supported by the model")
+
+    if embedding_type == 'text_dense_embedding':
         embeddings: list[list[float]]
         usage: int
         embeddings, usage = await embedding_engine.text_dense_embed(sentences=inputs)
@@ -79,7 +90,7 @@ async def dense_embeddings(request: EmbeddingRequest, raw_request: Request) -> E
         response = EmbeddingResponse(data = dense_embedding_datas, model=request.model, usage=EmbeddingUsage(prompt_tokens=usage, total_tokens=usage))
         logger.debug("dense embeddings: %s", len(inputs))
         return response
-    elif embedding_type == 'text_sparse':
+    elif embedding_type == 'text_sparse_embedding':
         embeddings: list[dict[str, float]]
         usage: int
         embeddings, usage = await embedding_engine.text_sparse_embed(sentences=inputs)
@@ -89,21 +100,13 @@ async def dense_embeddings(request: EmbeddingRequest, raw_request: Request) -> E
                                            usage=EmbeddingUsage(prompt_tokens=usage, total_tokens=usage))
         logger.debug("sparse embeddings: %s", len(inputs))
         return response
-    elif embedding_type == 'image':
-        image_types = ["jpeg", "jpg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg"]
+    elif embedding_type == 'image_embedding':
         embeddings: list[list[float]]
         usage: int
-        # TODO base64 to image
         images:[Image] = []
         for _input in inputs:
-            _s = _input.split(",")
-            _head = _s[0]
-            _content = _s[1]
-            if re.match(r"^data:image\/(" + "|".join(image_types) + r");base64", _head):
-                image = Image.open(BytesIO(base64.b64decode(_content)))
-                images.append(image)
-            else:
-                raise ValueError(f"Unsupported image type: {_head}")
+            image = base64_to_image(_input)
+            images.append(image)
 
         embeddings, usage = await embedding_engine.image_dense_embed(images=images)
         dense_embedding_datas = [DenseEmbeddingData(embedding=item, index=i) for i, item in enumerate(embeddings)]
@@ -112,7 +115,8 @@ async def dense_embeddings(request: EmbeddingRequest, raw_request: Request) -> E
                                           usage=EmbeddingUsage(prompt_tokens=usage, total_tokens=usage))
         logger.debug("image embeddings: %s", len(inputs))
         return response
-
+    else:
+        raise NotImplementedError(f"embedding type {embedding_type} is not implemented")
 if __name__ == "__main__":
     import argparse
 

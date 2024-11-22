@@ -6,11 +6,12 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 
 from PIL import Image
-from typing import Union
+from typing import Union, Any
 
 import uvicorn
 from fastapi import FastAPI
 from starlette.datastructures import State
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from transformers import AutoConfig, AutoModel, XLMRobertaModel, PreTrainedModel
@@ -56,21 +57,32 @@ def init_app_state(state: State, args: Namespace) -> None:
 
 embedding_app = FastAPI(lifespan=lifespan)
 
+class RequestError(Exception):
+    def __init__(self, message: str, code: int = 400, data: Any = None):
+        self.message = message
+        self.code = code
+        self.data = data
+        super().__init__(message)
+
 def base64_to_image(base64_str: str) -> Image:
     _s = base64_str.split(",")
     _head = _s[0]
-    _content = _s[1]
-    if re.match(r"^data:image\/(" + "|".join(["jpeg", "jpg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg"]) + r");base64", _head):
+    if _head is not None and re.match(r"^data:image\/(" + "|".join(["jpeg", "jpg", "png", "gif", "bmp", "tiff", "tif", "webp", "svg"]) + r");base64", _head):
+        _content = _s[1]
         return Image.open(BytesIO(base64.b64decode(_content)))
     else:
-        raise ValueError(f"Input string should be valid base64 encoded string and  start with 'data:image/xxx;base64', currently supported image types are: jpeg, jpg, png, gif, bmp, tiff, tif, webp, svg")
+        logger.error("Input string should be valid base64 encoded string and  start with 'data:image/xxx;base64', currently supported image types are: jpeg, jpg, png, gif, bmp, tiff, tif, webp, svg")
+        raise RequestError(f"Input string should be valid base64 encoded string and  start with 'data:image/xxx;base64', currently supported image types are: jpeg, jpg, png, gif, bmp, tiff, tif, webp, svg")
 
 @embedding_app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"error": str(exc)})
 
+@embedding_app.exception_handler(RequestError)
+async def exception_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=400, content={"error": str(exc)})
 @embedding_app.post("/v1/embeddings")
-async def execute_embedding(request: EmbeddingRequest, raw_request: Request) -> EmbeddingResponse:
+async def execute_embedding(request: EmbeddingRequest, raw_request: Request):
     logger.debug("received embedding request")
     if isinstance(request.input, list):
         inputs = request.input
@@ -79,7 +91,8 @@ async def execute_embedding(request: EmbeddingRequest, raw_request: Request) -> 
     embedding_type = request.embedding_type
     embedding_engine: AsyncEmbeddingEngine = raw_request.app.state.engine
     if embedding_type not in embedding_engine.model.support_embedding_types:
-        raise ValueError(f"embedding type {embedding_type} is not supported by the model")
+        logger.error("embedding type %s is not supported by the model", embedding_type)
+        raise RequestError(f"embedding type {embedding_type} is not supported by the model")
 
     if embedding_type == 'text_dense_embedding':
         embeddings: list[list[float]]
@@ -116,7 +129,8 @@ async def execute_embedding(request: EmbeddingRequest, raw_request: Request) -> 
         logger.debug("image embeddings: %s", len(inputs))
         return response
     else:
-        raise NotImplementedError(f"embedding type {embedding_type} is not implemented")
+        logger.error("embedding type %s is not implemented", embedding_type)
+        raise RequestError(f"embedding type {embedding_type} is not implemented")
 if __name__ == "__main__":
     import argparse
 

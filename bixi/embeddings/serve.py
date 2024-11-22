@@ -134,7 +134,7 @@ async def execute_embedding(request: EmbeddingRequest, raw_request: Request):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Embedding Server ")
+    parser = argparse.ArgumentParser(description="Embedding Server")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="主机地址")
     parser.add_argument("--port", type=int, default=8000, help="端口号")
     parser.add_argument("--model", type=str, help="huggingface模型ID或者本地模型的路径")

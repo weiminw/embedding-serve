@@ -10,7 +10,7 @@ import transformers
 from PIL import Image
 from transformers import AutoConfig, AutoTokenizer, is_torch_npu_available, AutoModel, AutoModelForTokenClassification, \
     BatchEncoding, SiglipModel, ViTModel, SiglipImageProcessor, ViTImageProcessor, ViTImageProcessorFast, BatchFeature, \
-    XLMRobertaModel
+    XLMRobertaModel, SiglipVisionModel
 from transformers.modeling_outputs import TokenClassifierOutput
 from typing_extensions import Literal
 
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class EmbeddingModel(torch.nn.Module):
     support_embedding_types: list[Literal["text_dense_embedding", "text_sparse_embedding", "image_embedding"]] = []
     model_type: str
+    torch_dtype: torch.dtype
     max_token_length: int
     config: Any
     model: Any
@@ -27,6 +28,11 @@ class EmbeddingModel(torch.nn.Module):
 
     def __init__(self, model_name_or_path: str, use_fp16: bool, max_token_length: int, trust_remote_code: bool = True):
         super(EmbeddingModel, self).__init__()
+        if use_fp16:
+            self.torch_dtype = torch.float16
+        else:
+            self.torch_dtype = torch.float32
+
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         elif torch.backends.mps.is_available():
@@ -36,6 +42,7 @@ class EmbeddingModel(torch.nn.Module):
         else:
             self.device = torch.device("cpu")
             use_fp16 = False
+            self.torch_dtype = torch.float32
         self.max_token_length = max_token_length
         self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
 
@@ -66,9 +73,8 @@ class EmbeddingModel(torch.nn.Module):
                 pretrained_model_name_or_path=model_name_or_path,
                 return_tensors="pt",
                 torch_type=torch.float16 if use_fp16 else None,
-                device_map="cuda"
             )
-            self.model = SiglipModel.from_pretrained(
+            self.model = SiglipVisionModel.from_pretrained(
                 pretrained_model_name_or_path=model_name_or_path,
                 torch_dtype=torch.float16 if use_fp16 else None,
                 device_map=self.device,
@@ -76,11 +82,12 @@ class EmbeddingModel(torch.nn.Module):
             self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
             self.support_embedding_types = ["image_embedding"]
         elif self.model_type == "vit":
-            self.image_processor = ViTImageProcessorFast.from_pretrained(
+            self.image_processor = ViTImageProcessor.from_pretrained(
                 pretrained_model_name_or_path=model_name_or_path,
-                torch_type=torch.float16 if use_fp16 else None,
+                torch_dtype=torch.float16 if use_fp16 else None,
                 return_tensors="pt",
-                device_map="cuda"
+
+                device_map=self.device
             )
             self.model = ViTModel.from_pretrained(
                 pretrained_model_name_or_path=model_name_or_path,
@@ -160,7 +167,10 @@ class EmbeddingModel(torch.nn.Module):
                 truncation=True,
                 return_tensors="pt",
                 max_length=max_length)  # {'input_ids': tensor([[14990,  1879]]), 'attention_mask': tensor([[1, 1]])}
-            chunk_inputs: dict[str, torch.Tensor] = {k: v.to(self.device) for k, v in chunk_encoding.items()}
+            if self.torch_dtype == torch.float16:
+                chunk_inputs = {k: v.half().to(self.device) for k, v in chunk_encoding.items()}
+            else:
+                chunk_inputs: dict[str, torch.Tensor] = {k: v.to(self.device) for k, v in chunk_encoding.items()}
             model_output = self.model(**chunk_inputs, return_dict=True, output_hidden_states=True)
             chunk_dense = torch.nn.functional.normalize(model_output["pooler_output"], p=2, dim=-1)
             return chunk_dense.detach().cpu().numpy()

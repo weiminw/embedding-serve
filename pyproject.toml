@@ -13,7 +13,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "torch==2.4.1", "peft", "uvicorn", "fastapi", "logging-config", "transformers"
+    "torch==2.4.1", "torchvision==0.19.1", "sentencepiece", "protobuf", "peft", "uvicorn", "fastapi", "logging-config", "transformers", "pillow"
 ]
 
 [tool.setuptools.packages.find]

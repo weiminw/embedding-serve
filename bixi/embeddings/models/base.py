@@ -23,6 +23,7 @@ class EmbeddingModel(torch.nn.Module):
     model: Any
     tokenizer: Any
     image_processor: Any
+    sparse_linear_model: Any
 
     def __init__(self, model_name_or_path: str, use_fp16: bool, max_token_length: int, trust_remote_code: bool = True):
         super(EmbeddingModel, self).__init__()
@@ -37,7 +38,7 @@ class EmbeddingModel(torch.nn.Module):
             use_fp16 = False
         self.max_token_length = max_token_length
         self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+
         self.model_type = self.config.model_type
         if self.model_type == "new":  # Alibaba-NLP: GTE
             self.model = AutoModelForTokenClassification.from_pretrained(
@@ -45,6 +46,7 @@ class EmbeddingModel(torch.nn.Module):
                 trust_remote_code=trust_remote_code,
                 torch_dtype=torch.float16 if use_fp16 else None,
                 device_map=self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
             self.support_embedding_types = ["text_dense_embedding", "text_sparse_embedding"]
         elif self.model_type == "xlm-roberta":
             self.model = XLMRobertaModel.from_pretrained(
@@ -52,7 +54,13 @@ class EmbeddingModel(torch.nn.Module):
                 trust_remote_code=trust_remote_code,
                 torch_dtype=torch.float16 if use_fp16 else None,
                 device_map=self.device)
-            self.support_embedding_types=["text_dense_embedding"]
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+            if os.path.join(model_name_or_path, "sparse_linear.pt"):
+                self.sparse_linear_model = torch.nn.Linear(self.model.config.hidden_size, 1, dtype=torch.float16 if use_fp16 else None).to(self.device)
+                self.sparse_linear_model.load_state_dict(torch.load(f"{model_name_or_path}/sparse_linear.pt"))
+                self.support_embedding_types = ["text_dense_embedding", "text_sparse_embedding"]
+            else:
+                self.support_embedding_types=["text_dense_embedding"]
         elif self.model_type == "siglip":
             self.image_processor = SiglipImageProcessor.from_pretrained(
                 pretrained_model_name_or_path=model_name_or_path,
@@ -65,6 +73,7 @@ class EmbeddingModel(torch.nn.Module):
                 torch_dtype=torch.float16 if use_fp16 else None,
                 device_map=self.device,
                 attn_implementation="sdpa")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
             self.support_embedding_types = ["image_embedding"]
         elif self.model_type == "vit":
             self.image_processor = ViTImageProcessorFast.from_pretrained(
@@ -99,7 +108,10 @@ class EmbeddingModel(torch.nn.Module):
 
 
     def _sparse_embedding(self, model_output: TokenClassifierOutput, inputs: dict[str, torch.Tensor]) -> numpy.array:
-        token_weights = torch.relu(model_output.logits).squeeze(-1)
+        if hasattr(self, 'sparse_linear_model')and self.sparse_linear_model is not None:
+            token_weights = torch.relu(self.sparse_linear_model(model_output["last_hidden_state"])).squeeze(-1)
+        else:
+            token_weights = torch.relu(model_output.logits).squeeze(-1)
         print("token_weights: %s",token_weights)
         token_weights = torch.nn.functional.normalize(token_weights, p=2, dim=-1)
         print("token_weights norm: %s", token_weights)

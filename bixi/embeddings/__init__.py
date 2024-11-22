@@ -1,6 +1,5 @@
 
-from bixi.embeddings.protocol import DenseEmbeddingRequest, DenseEmbeddingData, EmbeddingUsage, DenseEmbeddingResponse, \
-    SparseEmbeddingRequest, SparseEmbeddingData, SparseEmbeddingResponse
+from bixi.embeddings.protocol import EmbeddingRequest, DenseEmbeddingData, EmbeddingUsage, \
+    SparseEmbeddingData, EmbeddingResponse
 
-__all__ = ["DenseEmbeddingRequest", "DenseEmbeddingData", "EmbeddingUsage", "DenseEmbeddingResponse",
-           "SparseEmbeddingRequest", "SparseEmbeddingData", "SparseEmbeddingResponse"]
+__all__ = ["EmbeddingRequest", "DenseEmbeddingData", "EmbeddingUsage", "EmbeddingResponse", "SparseEmbeddingData"]

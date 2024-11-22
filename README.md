@@ -1,2 +1,12 @@
 # embedding-serve
-create a embedding inference server for BGE - m3 model support sparse embedding
+embedding-serve is a fast and easy-to-use library for document embedding.  
+embedding-serve supports the following:
+- [x] text dense embedding: BGE, GTE(Alibaba-NLP)
+- [x] text sparse embedding: BGE, GTE(Alibaba-NLP)
+- [x] image embedding: SigLIP, ViT
+
+## Getting Started
+### Deploying with Docker
+```bash
+docker run --gpus all -itd -p 8000:8000 /path/to/your/models:/models/ embedding-serve sh -c "source /workspace/heliumos-env/bin/activate && python -m bixi.embeddings.serve --model /models/model_path --log-level INFO"
+```

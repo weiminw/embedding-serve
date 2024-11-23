@@ -4,8 +4,8 @@ LABEL authors="wangwm"
 #ENV HOME=/workspace
 WORKDIR /workspace
 COPY . /workspace/heliumos-bixi-embeddings
-COPY /workspace/heliumos-bixi-embeddings/entrypoint.sh /opt/entrypoint.sh
-RUN chmod +x /opt/entrypoint.sh
+RUN cp /workspace/heliumos-bixi-embeddings/entrypoint.sh /opt/entrypoint.sh \
+    && chmod +x /opt/entrypoint.sh
 #RUN cp /root/.bashrc /workspace/
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 RUN apt-get update -y && apt-get install -y python3.11 curl net-tools openssh-server vim python3-pip python3.11-venv

@@ -6,6 +6,11 @@ embedding-serve supports the following:
 - [x] image embedding: SigLIP, ViT
 
 ## Getting Started
+### Install with pip
+```bash
+pip install heliumos-bixi-embeddings
+```
+
 ### Deploying with Docker
 ```bash
 docker run --gpus all -itd -p 8000:8000 /path/to/your/models:/models/ weiminw/heliumos-bixi-embeddings:0.6.0 sh -c "source /workspace/heliumos-env/bin/activate && python -m bixi.embeddings.serve --model /models/model_path --log-level INFO"

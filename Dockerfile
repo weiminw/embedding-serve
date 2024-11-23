@@ -4,6 +4,8 @@ LABEL authors="wangwm"
 #ENV HOME=/workspace
 WORKDIR /workspace
 COPY . /workspace/heliumos-bixi-embeddings
+COPY /workspace/heliumos-bixi-embeddings/entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
 #RUN cp /root/.bashrc /workspace/
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 RUN apt-get update -y && apt-get install -y python3.11 curl net-tools openssh-server vim python3-pip python3.11-venv
@@ -20,3 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && pip3 install torch==2.4.1 transformers -i ${pip_source} \
     && pip3 install . -i ${pip_source}
 RUN pip3 cache purge && cd /workspace && rm -rf /workspace/heliumos-bixi-embeddings
+ENTRYPOINT ["/entrypoint.sh"]

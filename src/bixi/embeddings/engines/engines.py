@@ -7,9 +7,8 @@ from copy import deepcopy
 from typing import Tuple, Callable, Coroutine
 
 from PIL import Image
-from transformers import AutoModel
 
-from bixi.embeddings.models.base import EmbeddingModel
+from src.bixi.embeddings.models.base import EmbeddingModel
 
 logger = logging.getLogger(__name__)
 

@@ -6,22 +6,20 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 
 from PIL import Image
-from typing import Union, Any
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
 from starlette.datastructures import State
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from transformers import AutoConfig, AutoModel, XLMRobertaModel, PreTrainedModel
 
-from bixi.embeddings import SparseEmbeddingData, \
+from src.bixi import SparseEmbeddingData, \
     DenseEmbeddingData,  EmbeddingUsage
-from bixi.embeddings.engines import AsyncEmbeddingEngine
-from bixi.embeddings.models.base import EmbeddingModel
-from bixi.embeddings.protocol import EmbeddingRequest, EmbeddingResponse
-from bixi.embeddings.settings import configure_logging, get_logging_configuration
+from src.bixi import AsyncEmbeddingEngine
+from src.bixi.embeddings.models.base import EmbeddingModel
+from src.bixi import EmbeddingRequest, EmbeddingResponse
+from src.bixi import configure_logging, get_logging_configuration
 
 logger = logging.getLogger("bixi.embeddings.serve")
 

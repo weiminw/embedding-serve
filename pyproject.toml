@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "heliumos-bixi-embeddings"
 version = "0.6.0"
-description = "An open platform for load large language model."
+description = "heliumos-bixi-embeddings is a fast and easy-to-use library for document embedding."
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
+where = ['src']
 exclude = ["assets*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "tests*"]
 
 [tool.wheel]

@@ -6,7 +6,6 @@ from typing import Union, Any
 import numpy
 import numpy as np
 import torch
-import transformers
 from PIL import Image
 from transformers import AutoConfig, AutoTokenizer, is_torch_npu_available, AutoModel, AutoModelForTokenClassification, \
     BatchEncoding, SiglipModel, ViTModel, SiglipImageProcessor, ViTImageProcessor, ViTImageProcessorFast, BatchFeature, \

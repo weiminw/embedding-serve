@@ -14,12 +14,12 @@ from starlette.datastructures import State
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from src.bixi import SparseEmbeddingData, \
+from bixi.embeddings import SparseEmbeddingData, \
     DenseEmbeddingData,  EmbeddingUsage
-from src.bixi import AsyncEmbeddingEngine
-from src.bixi.embeddings.models.base import EmbeddingModel
-from src.bixi import EmbeddingRequest, EmbeddingResponse
-from src.bixi import configure_logging, get_logging_configuration
+from bixi.embeddings.engines import AsyncEmbeddingEngine
+from bixi.embeddings.models import EmbeddingModel
+from bixi.embeddings import EmbeddingRequest, EmbeddingResponse
+from bixi.embeddings.settings import configure_logging, get_logging_configuration
 
 logger = logging.getLogger("bixi.embeddings.serve")
 

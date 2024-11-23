@@ -8,7 +8,7 @@ from typing import Tuple, Callable, Coroutine
 
 from PIL import Image
 
-from src.bixi.embeddings.models.base import EmbeddingModel
+from bixi.embeddings.models.base import EmbeddingModel
 
 logger = logging.getLogger(__name__)
 

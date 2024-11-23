@@ -1,4 +1,4 @@
-from src.bixi import EmbeddingModel
+from bixi import EmbeddingModel
 
 # model = EmbeddingModel("/workspace/models/Baai/bge-m3", use_fp16=True, max_token_length=8192, )
 model = EmbeddingModel("/workspace/models/gte-multilingual-base", use_fp16=True, max_token_length=8192, )

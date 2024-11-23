@@ -22,4 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && pip3 install torch==2.4.1 transformers -i ${pip_source} \
     && pip3 install . -i ${pip_source}
 RUN pip3 cache purge && cd /workspace && rm -rf /workspace/heliumos-bixi-embeddings
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/opt/entrypoint.sh"]

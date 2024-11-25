@@ -100,16 +100,22 @@ class EmbeddingModel(torch.nn.Module):
 
     def _process_token_weights(self, token_weights: np.ndarray, input_ids: list):
         # convert to dict
-        result = defaultdict(int)
+        result = {}
         unused_tokens = {self.tokenizer.cls_token_id, self.tokenizer.eos_token_id, self.tokenizer.pad_token_id,
                          self.tokenizer.unk_token_id}
+        logger.debug("unused_tokens: %s", unused_tokens)
         # token_weights = np.ceil(token_weights * 100)
         for w, idx in zip(token_weights, input_ids):
             if idx not in unused_tokens and w > 0:
                 token = self.tokenizer.decode([int(idx)])
-                if w > result[token]:
-                    result[token] = w
-        return dict(result)
+                # milvus does not support string token key, just idx
+                # if w > result.get(token, 0.0):
+                #     result[token] = w
+
+                if w > result.get(str(idx), 0.0):
+                    result[str(idx)] = w
+        logger.debug("result: %s", result)
+        return result
 
 
 
@@ -118,9 +124,7 @@ class EmbeddingModel(torch.nn.Module):
             token_weights = torch.relu(self.sparse_linear_model(model_output["last_hidden_state"])).squeeze(-1)
         else:
             token_weights = torch.relu(model_output.logits).squeeze(-1)
-        print("token_weights: %s",token_weights)
         token_weights = torch.nn.functional.normalize(token_weights, p=2, dim=-1)
-        print("token_weights norm: %s", token_weights)
         token_weights = list(map(self._process_token_weights, token_weights.detach().cpu().numpy().tolist(),
                                  inputs['input_ids'].detach().cpu().numpy().tolist()))
         return token_weights
